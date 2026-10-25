@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Flappy Viper // Cyberpunk Digital Grid</title>
+  <meta name="description" content="A futuristic cyberpunk serpent arcade game featuring reverse gravity physics, laser data barriers, and responsive neon mechanics.">
+  <style>
+    /* ==========================================================================
+       CYBERPUNK DESIGN SYSTEM & COLOR TOKENS
+       ========================================================================== */
+    :root {
+      --bg-void: #02040a;
+      --bg-panel: rgba(8, 14, 28, 0.92);
+      --bg-card: rgba(11, 18, 38, 0.9);
+      --neon-green: #00FF41;
+      --neon-green-glow: rgba(0, 255, 65, 0.45);
+      --neon-cyan: #00F0FF;
+      --neon-cyan-glow: rgba(0, 240, 255, 0.45);
+      --neon-pink: #FF1493;
+      --neon-pink-glow: rgba(255, 20, 147, 0.5);
+      --neon-red: #ff003c;
+      --neon-red-glow: rgba(255, 0, 60, 0.55);
+      --neon-amber: #ffb703;
+      --text-bright: #f0fdf4;
+      --text-muted: #8899ac;
+      --border-cyber: rgba(0, 240, 255, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-void);
+      color: var(--text-bright);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    /* Ambient cybernetic grid atmosphere */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 720px;
+      height: 720px;
+      background: radial-gradient(circle, rgba(0, 255, 65, 0.06) 0%, rgba(0, 240, 255, 0.05) 35%, rgba(255, 20, 147, 0.04) 65%, transparent 80%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Game Container Wrapper */
+    #gameWrapper {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      height: 100vh;
+      max-height: 720px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1;
+      padding: 10px;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 
+        0 0 0 1px var(--border-cyber),
+        0 16px 48px rgba(0, 0, 0, 0.95),
+        0 0 36px rgba(0, 240, 255, 0.15);
+      background: #02040b;
+    }
+
+    canvas#gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: pointer;
+    }
+
+    /* CRT Scanline & Lens Vignette Shader Effect */
+    .crt-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: 
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%),
+        radial-gradient(circle, transparent 65%, rgba(0, 0, 0, 0.72) 100%);
+      background-size: 100% 4px, 100% 100%;
+      z-index: 10;
+      opacity: 0.6;
+    }
+
+    /* In-Game Minimal Futuristic HUD */
+    .ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 18px;
+      z-index: 20;
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      pointer-events: auto;
+    }
+
+    .hud-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .score-badge {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-cyber);
+      border-radius: 18px;
+      padding: 6px 16px;
+      font-size: 1.5rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: var(--neon-green);
+      text-shadow: 0 0 12px var(--neon-green-glow);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .score-badge.pulse {
+      transform: scale(1.22);
+    }
+
+    .diff-badge-hud {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border-radius: 12px;
+      border: 1px solid currentColor;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+      transition: all 0.2s ease;
+    }
+
+    .diff-badge-hud.rookie {
+      color: var(--neon-green);
+      background: rgba(0, 255, 65, 0.12);
+      box-shadow: 0 0 12px var(--neon-green-glow);
+    }
+
+    .diff-badge-hud.pro {
+      color: var(--neon-cyan);
+      background: rgba(0, 240, 255, 0.12);
+      box-shadow: 0 0 12px var(--neon-cyan-glow);
+    }
+
+    .diff-badge-hud.legend {
+      color: var(--neon-pink);
+      background: rgba(255, 20, 147, 0.12);
+      box-shadow: 0 0 12px var(--neon-pink-glow);
+    }
+
+    .hud-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-cyber);
+      color: var(--text-bright);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      font-size: 16px;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--neon-green);
+      color: var(--neon-green);
+      box-shadow: 0 0 12px var(--neon-green-glow);
+      transform: translateY(-1px);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.94);
+    }
+
+    .icon-btn:focus-visible {
+      box-shadow: 0 0 0 2px var(--neon-cyan);
+    }
+
+    /* Modal Screens (Start Menu, Game Over) */
+    .modal-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 18px 20px;
+      background: rgba(2, 4, 11, 0.9);
+      backdrop-filter: blur(14px);
+      z-index: 30;
+      pointer-events: auto;
+      text-align: center;
+      overflow-y: auto;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .modal-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.96);
+    }
+
+    /* Title Block */
+    .game-logo {
+      margin-bottom: 12px;
+    }
+
+    .logo-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: var(--neon-green);
+      background: rgba(0, 255, 65, 0.12);
+      border: 1px solid var(--neon-green);
+      border-radius: 12px;
+      padding: 2px 10px;
+      margin-bottom: 4px;
+      font-weight: 800;
+      box-shadow: 0 0 10px var(--neon-green-glow);
+    }
+
+    .logo-title {
+      font-size: 2.35rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #ffffff 0%, var(--neon-green) 50%, var(--neon-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 28px rgba(0, 255, 65, 0.35);
+    }
+
+    .logo-subtitle {
+      font-size: 0.78rem;
+      letter-spacing: 4px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      font-weight: 700;
+    }
+
+    /* Instructions Panel */
+    .tutorial-card {
+      background: rgba(10, 18, 38, 0.85);
+      border: 1px solid rgba(0, 240, 255, 0.22);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      max-width: 330px;
+      width: 100%;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    }
+
+    .rule-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 5px 0;
+      font-size: 0.8rem;
+      text-align: left;
+    }
+
+    .rule-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: rgba(0, 255, 65, 0.12);
+      border: 1px solid var(--neon-green);
+      color: var(--neon-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .rule-icon.down {
+      background: rgba(255, 20, 147, 0.12);
+      border-color: var(--neon-pink);
+      color: var(--neon-pink);
+    }
+
+    /* Difficulty Section: CHOOSE YOUR CHALLENGE */
+    .challenge-section {
+      width: 100%;
+      max-width: 330px;
+      margin-bottom: 14px;
+    }
+
+    .challenge-heading {
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      color: var(--neon-cyan);
+      margin-bottom: 8px;
+      font-weight: 800;
+      text-shadow: 0 0 10px var(--neon-cyan-glow);
+    }
+
+    .difficulty-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    /* Interactive Level Card */
+    .diff-card {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 9px 14px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      outline: none;
+      color: var(--text-bright);
+    }
+
+    .diff-card-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .diff-radio-indicator {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .diff-radio-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: transparent;
+      transition: all 0.2s ease;
+    }
+
+    .diff-number {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 1px;
+    }
+
+    .diff-title {
+      font-size: 0.88rem;
+      font-weight: 900;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+
+    .diff-desc {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .diff-multiplier-badge {
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      border: 1px solid currentColor;
+      flex-shrink: 0;
+    }
+
+    /* Rookie Card (#00FF41) */
+    .diff-card.rookie {
+      border-color: rgba(0, 255, 65, 0.3);
+    }
+    .diff-card.rookie .diff-title { color: var(--neon-green); }
+    .diff-card.rookie .diff-multiplier-badge { color: var(--neon-green); background: rgba(0, 255, 65, 0.12); }
+    .diff-card.rookie:hover, .diff-card.rookie:focus-visible {
+      border-color: var(--neon-green);
+      box-shadow: 0 0 16px var(--neon-green-glow);
+      transform: translateY(-2px);
+    }
+    .diff-card.rookie.selected {
+      border-color: var(--neon-green);
+      background: rgba(0, 255, 65, 0.08);
+      box-shadow: 0 0 20px var(--neon-green-glow), inset 0 0 12px rgba(0, 255, 65, 0.1);
+    }
+    .diff-card.rookie.selected .diff-radio-indicator {
+      border-color: var(--neon-green);
+      box-shadow: 0 0 8px var(--neon-green-glow);
+    }
+    .diff-card.rookie.selected .diff-radio-dot {
+      background: var(--neon-green);
+    }
+
+    /* Pro Card (#00F0FF) */
+    .diff-card.pro {
+      border-color: rgba(0, 240, 255, 0.3);
+    }
+    .diff-card.pro .diff-title { color: var(--neon-cyan); }
+    .diff-card.pro .diff-multiplier-badge { color: var(--neon-cyan); background: rgba(0, 240, 255, 0.12); }
+    .diff-card.pro:hover, .diff-card.pro:focus-visible {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 16px var(--neon-cyan-glow);
+      transform: translateY(-2px);
+    }
+    .diff-card.pro.selected {
+      border-color: var(--neon-cyan);
+      background: rgba(0, 240, 255, 0.08);
+      box-shadow: 0 0 20px var(--neon-cyan-glow), inset 0 0 12px rgba(0, 240, 255, 0.1);
+    }
+    .diff-card.pro.selected .diff-radio-indicator {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 8px var(--neon-cyan-glow);
+    }
+    .diff-card.pro.selected .diff-radio-dot {
+      background: var(--neon-cyan);
+    }
+
+    /* Legend Card (#FF1493) */
+    .diff-card.legend {
+      border-color: rgba(255, 20, 147, 0.3);
+    }
+    .diff-card.legend .diff-title { color: var(--neon-pink); }
+    .diff-card.legend .diff-multiplier-badge { color: var(--neon-pink); background: rgba(255, 20, 147, 0.12); }
+    .diff-card.legend:hover, .diff-card.legend:focus-visible {
+      border-color: var(--neon-pink);
+      box-shadow: 0 0 16px var(--neon-pink-glow);
+      transform: translateY(-2px);
+    }
+    .diff-card.legend.selected {
+      border-color: var(--neon-pink);
+      background: rgba(255, 20, 147, 0.08);
+      box-shadow: 0 0 20px var(--neon-pink-glow), inset 0 0 12px rgba(255, 20, 147, 0.1);
+    }
+    .diff-card.legend.selected .diff-radio-indicator {
+      border-color: var(--neon-pink);
+      box-shadow: 0 0 8px var(--neon-pink-glow);
+    }
+    .diff-card.legend.selected .diff-radio-dot {
+      background: var(--neon-pink);
+    }
+
+    /* Keyboard Shortcut Legend */
+    .key-prompt {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .key-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-family: monospace;
+      color: #fff;
+      font-size: 0.68rem;
+    }
+
+    /* Action Buttons */
+    .btn-action-primary {
+      background: linear-gradient(135deg, var(--neon-green) 0%, #00b4d8 100%);
+      color: #020712;
+      font-weight: 900;
+      font-size: 1rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 13px 30px;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 0 22px var(--neon-green-glow), 0 4px 15px rgba(0, 0, 0, 0.45);
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      outline: none;
+      width: 100%;
+      max-width: 290px;
+    }
+
+    .btn-action-primary:hover {
+      transform: scale(1.04);
+      box-shadow: 0 0 30px var(--neon-green-glow);
+    }
+
+    .btn-action-primary:active {
+      transform: scale(0.97);
+    }
+
+    .btn-action-primary:focus-visible {
+      box-shadow: 0 0 0 3px var(--neon-cyan);
+    }
+
+    /* Game Over Modal (MISSION FAILED) */
+    .gameover-title {
+      font-size: 2.1rem;
+      font-weight: 900;
+      color: var(--neon-red);
+      text-shadow: 0 0 24px var(--neon-red-glow);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 14px;
+      animation: alertFlicker 2.5s infinite;
+    }
+
+    @keyframes alertFlicker {
+      0%, 100% { opacity: 1; }
+      48% { opacity: 0.88; }
+      50% { opacity: 0.4; }
+      52% { opacity: 1; }
+    }
+
+    .stats-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-cyber);
+      border-radius: 14px;
+      padding: 16px 20px;
+      width: 100%;
+      max-width: 310px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: #fff;
+    }
+
+    .stat-value.highlight {
+      color: var(--neon-amber);
+      text-shadow: 0 0 10px rgba(255, 183, 3, 0.5);
+    }
+
+    .new-best-badge {
+      display: none;
+      margin-top: 6px;
+      padding: 3px 10px;
+      background: rgba(255, 183, 3, 0.15);
+      border: 1px solid var(--neon-amber);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      color: var(--neon-amber);
+      letter-spacing: 1.5px;
+      animation: pulseGlow 1s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { box-shadow: 0 0 4px rgba(255, 183, 3, 0.3); }
+      to { box-shadow: 0 0 14px var(--neon-amber); }
+    }
+
+    .btn-action-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: var(--text-bright);
+      font-weight: 800;
+      font-size: 0.88rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 11px 24px;
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+      width: 100%;
+      max-width: 290px;
+      margin-top: 8px;
+    }
+
+    .btn-action-secondary:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      transform: translateY(-1px);
+    }
+
+    .btn-action-secondary:active {
+      transform: scale(0.97);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gameWrapper">
+    <div class="canvas-container" id="canvasContainer">
+      <canvas id="gameCanvas" width="420" height="680"></canvas>
+      <div class="crt-overlay"></div>
+
+      <!-- In-Game Minimal Futuristic HUD -->
+      <div class="ui-layer" id="hudLayer">
+        <div class="hud-header">
+          <div class="hud-left">
+            <div class="score-badge" id="hudScore" aria-label="Current Score">0</div>
+            <div class="diff-badge-hud rookie" id="hudDiffTag">ROOKIE MODE</div>
+          </div>
+          <div class="hud-controls">
+            <button class="icon-btn" id="soundBtn" title="Toggle Sound (M)" aria-label="Toggle Sound">🔊</button>
+            <button class="icon-btn" id="pauseBtn" title="Pause Game (P)" aria-label="Pause Game">⏸</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Start Screen Modal with Difficulty Selection & Start Mission -->
+      <div class="modal-screen" id="startScreen" role="dialog" aria-modal="true" aria-labelledby="mainTitle">
+        <div class="game-logo">
+          <div class="logo-badge">Neural Serpent Link</div>
+          <h1 class="logo-title" id="mainTitle">Flappy Viper</h1>
+          <div class="logo-subtitle">CYBERPUNK // DIGITAL GRID</div>
+        </div>
+
+        <!-- Instructions Panel -->
+        <div class="tutorial-card">
+          <div class="rule-item">
+            <div class="rule-icon">⬆️</div>
+            <div>
+              <strong>REVERSE GRAVITY</strong><br>
+              <span style="color: var(--text-muted); font-size: 0.75rem;">The Viper naturally floats UP toward the ceiling.</span>
+            </div>
+          </div>
+          <div class="rule-item">
+            <div class="rule-icon down">⬇️</div>
+            <div>
+              <strong>JET PROPULSION</strong><br>
+              <span style="color: var(--text-muted); font-size: 0.75rem;">Press SPACE or TAP to push DOWN.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Difficulty Selection: CHOOSE YOUR CHALLENGE -->
+        <div class="challenge-section">
+          <div class="challenge-heading">CHOOSE YOUR CHALLENGE</div>
+          <div class="difficulty-group" role="radiogroup" aria-label="Difficulty Levels">
+            
+            <!-- LEVEL 01 — ROOKIE MODE -->
+            <button class="diff-card rookie selected" data-diff="rookie" id="btnDiffRookie" role="radio" aria-checked="true" tabindex="0">
+              <div class="diff-card-left">
+                <div class="diff-radio-indicator">
+                  <div class="diff-radio-dot"></div>
+                </div>
+                <div>
+                  <div class="diff-number">LEVEL 01</div>
+                  <div class="diff-title">ROOKIE MODE</div>
+                  <div class="diff-desc">Perfect for Beginners</div>
+                </div>
+              </div>
+              <div class="diff-multiplier-badge">1.0x</div>
+            </button>
+
+            <!-- LEVEL 02 — PRO MODE -->
+            <button class="diff-card pro" data-diff="pro" id="btnDiffPro" role="radio" aria-checked="false" tabindex="0">
+              <div class="diff-card-left">
+                <div class="diff-radio-indicator">
+                  <div class="diff-radio-dot"></div>
+                </div>
+                <div>
+                  <div class="diff-number">LEVEL 02</div>
+                  <div class="diff-title">PRO MODE</div>
+                  <div class="diff-desc">Test Your Skills</div>
+                </div>
+              </div>
+              <div class="diff-multiplier-badge">1.5x</div>
+            </button>
+
+            <!-- LEVEL 03 — LEGEND MODE -->
+            <button class="diff-card legend" data-diff="legend" id="btnDiffLegend" role="radio" aria-checked="false" tabindex="0">
+              <div class="diff-card-left">
+                <div class="diff-radio-indicator">
+                  <div class="diff-radio-dot"></div>
+                </div>
+                <div>
+                  <div class="diff-number">LEVEL 03</div>
+                  <div class="diff-title">LEGEND MODE</div>
+                  <div class="diff-desc">Master the Challenge</div>
+                </div>
+              </div>
+              <div class="diff-multiplier-badge">2.0x</div>
+            </button>
+
+          </div>
+        </div>
+
+        <div class="key-prompt">1 — Rookie | 2 — Pro | 3 — Legend</div>
+
+        <!-- Start Button -->
+        <button class="btn-action-primary" id="startMissionBtn">START MISSION</button>
+      </div>
+
+      <!-- Game Over Screen (MISSION FAILED) -->
+      <div class="modal-screen hidden" id="gameOverScreen" role="dialog" aria-modal="true" aria-labelledby="failTitle">
+        <div class="gameover-title" id="failTitle">MISSION FAILED</div>
+        <div class="stats-container">
+          <div class="stat-row">
+            <span>Difficulty</span>
+            <span class="diff-badge-hud rookie" id="overDiffBadge">ROOKIE MODE</span>
+          </div>
+          <div class="stat-row">
+            <span>Final Score</span>
+            <span class="stat-value" id="finalScore">0</span>
+          </div>
+          <div class="stat-row">
+            <span>Best Record</span>
+            <span class="stat-value highlight" id="bestScore">0</span>
+          </div>
+          <div class="new-best-badge" id="newBestBadge">★ NEW HIGH SCORE! ★</div>
+        </div>
+
+        <!-- Game Over Navigation -->
+        <button class="btn-action-primary" id="retryMissionBtn">RETRY MISSION</button>
+        <button class="btn-action-secondary" id="changeDifficultyBtn">CHANGE DIFFICULTY</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * FLAPPY VIPER - CYBERPUNK DIGITAL GRID
+     * ============================================================================
+     * Premium cyberpunk arcade flight simulator featuring inverse gravity physics.
+     * The Cyber-Viper continuously drifts UPWARDS toward the ceiling.
+     * Spacebar / Screen tap fires downward jet propulsion pushing the Viper DOWN.
+     *
+     * Obstacles: Technological Data Barriers with pulsating neon pink/red laser cores.
+     *
+     * Difficulty configurations accurately scale obstacle speed, vertical gap sizes,
+     * and horizontal spacing between barriers.
+     */
+
+    // --- Difficulty Levels Configuration ---
+    // Base speed = 2.2 px/frame. Multipliers: Rookie (1.0x), Pro (1.5x), Legend (2.0x)
+    const BASE_SPEED = 2.2;
+
+    const DIFFICULTY_CONFIG = {
+      rookie: {
+        id: 'rookie',
+        levelNumber: 'LEVEL 01',
+        name: 'ROOKIE MODE',
+        multiplierText: '1.0x',
+        speedMultiplier: 1.0,
+        color: '#00FF41',              // Neon Green
+        barrierSpeed: BASE_SPEED * 1.0, // 2.2 px/frame (slow obstacle movement)
+        gateGap: 195,                  // Wider obstacle gaps (forgiving)
+        spawnInterval: 135,            // Generous spacing (~297px distance)
+        class: 'rookie'
+      },
+      pro: {
+        id: 'pro',
+        levelNumber: 'LEVEL 02',
+        name: 'PRO MODE',
+        multiplierText: '1.5x',
+        speedMultiplier: 1.5,
+        color: '#00F0FF',              // Neon Cyan
+        barrierSpeed: BASE_SPEED * 1.5, // 3.3 px/frame (faster movement)
+        gateGap: 162,                  // Moderately challenging gaps
+        spawnInterval: 90,             // Balanced obstacle spacing (~297px distance)
+        class: 'pro'
+      },
+      legend: {
+        id: 'legend',
+        levelNumber: 'LEVEL 03',
+        name: 'LEGEND MODE',
+        multiplierText: '2.0x',
+        speedMultiplier: 2.0,
+        color: '#FF1493',              // Neon Pink
+        barrierSpeed: BASE_SPEED * 2.0, // 4.4 px/frame (fast obstacle movement)
+        gateGap: 138,                  // Narrower but fair obstacle gaps
+        spawnInterval: 68,             // Closer spacing (~299px distance)
+        class: 'legend'
+      }
+    };
+
+    // Consistent reverse-gravity physics parameters
+    const GRAVITY = -0.32;      // Upward drift acceleration
+    const THRUST = 6.8;         // Downward jet propulsion impulse
+    const MAX_UP_SPEED = -8.5;  // Terminal upward drift speed
+    const MAX_DOWN_SPEED = 9.5; // Terminal downward dive speed
+
+    // Selected difficulty state (persists across runs)
+    let selectedDifficultyKey = localStorage.getItem('fv_selected_diff') || 'rookie';
+    if (!DIFFICULTY_CONFIG[selectedDifficultyKey]) selectedDifficultyKey = 'rookie';
+    let activeConfig = DIFFICULTY_CONFIG[selectedDifficultyKey];
+
+    // --- Synthesized Sound Engine (Web Audio API, 0 External Dependencies) ---
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = localStorage.getItem('fv_muted') === 'true';
+        this.updateIcon();
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            this.ctx = new AudioContextClass();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        localStorage.setItem('fv_muted', this.muted);
+        this.updateIcon();
+      }
+
+      updateIcon() {
+        const btn = document.getElementById('soundBtn');
+        if (btn) btn.textContent = this.muted ? '🔇' : '🔊';
+      }
+
+      playThrust() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          
+          osc.frequency.setValueAtTime(360, now);
+          osc.frequency.exponentialRampToValueAtTime(130, now + 0.15);
+
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        } catch (e) {}
+      }
+
+      playScore() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          [587.33, 880.00].forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + i * 0.05);
+
+            gain.gain.setValueAtTime(0.18, now + i * 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.22);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.05);
+            osc.stop(now + i * 0.05 + 0.22);
+          });
+        } catch (e) {}
+      }
+
+      playCrash() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(170, now);
+          osc.frequency.exponentialRampToValueAtTime(25, now + 0.35);
+
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } catch (e) {}
+      }
+
+      playSelect() {
+        if (this.muted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(660, now + 0.06);
+
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.06);
+        } catch (e) {}
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    // --- Particle System ---
+    class Particle {
+      constructor(x, y, color, vx, vy, size, life) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.vx = vx;
+        this.vy = vy;
+        this.size = size;
+        this.maxLife = life;
+        this.life = life;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 1;
+        this.size = Math.max(0, this.size * 0.95);
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // --- Game Engine Setup & DOM Elements ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const hudScore = document.getElementById('hudScore');
+    const hudDiffTag = document.getElementById('hudDiffTag');
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const finalScoreEl = document.getElementById('finalScore');
+    const bestScoreEl = document.getElementById('bestScore');
+    const overDiffBadge = document.getElementById('overDiffBadge');
+    const newBestBadge = document.getElementById('newBestBadge');
+    const startMissionBtn = document.getElementById('startMissionBtn');
+    const retryMissionBtn = document.getElementById('retryMissionBtn');
+    const changeDifficultyBtn = document.getElementById('changeDifficultyBtn');
+    const soundBtn = document.getElementById('soundBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const diffCards = document.querySelectorAll('.diff-card');
+
+    // Virtual Game Coordinates
+    const GAME_WIDTH = 420;
+    const GAME_HEIGHT = 680;
+    canvas.width = GAME_WIDTH;
+    canvas.height = GAME_HEIGHT;
+
+    // States
+    const STATE = {
+      MENU: 0,
+      PLAYING: 1,
+      GAMEOVER: 2,
+      PAUSED: 3
+    };
+
+    let currentState = STATE.MENU;
+    let score = 0;
+    let frames = 0;
+    let screenShake = 0;
+    let particles = [];
+    let backgroundStars = [];
+    let animationFrameId = null;
+
+    // Hazard boundaries
+    const CEILING_HEIGHT = 16;
+    const GROUND_HEIGHT = 38;
+
+    // Starfield initialization
+    for (let i = 0; i < 60; i++) {
+      backgroundStars.push({
+        x: Math.random() * GAME_WIDTH,
+        y: Math.random() * GAME_HEIGHT,
+        radius: Math.random() * 1.5 + 0.4,
+        speed: Math.random() * 0.6 + 0.2,
+        alpha: Math.random() * 0.7 + 0.3,
+        pulseSpeed: Math.random() * 0.03 + 0.01
+      });
+    }
+
+    // High score persistence helpers
+    function getHighScore(diffKey) {
+      return parseInt(localStorage.getItem('fv_highscore_' + diffKey) || '0', 10);
+    }
+
+    function setHighScore(diffKey, val) {
+      localStorage.setItem('fv_highscore_' + diffKey, val);
+    }
+
+    // --- Cyber-Viper (Player Character) ---
+    const viper = {
+      x: 95,
+      y: GAME_HEIGHT / 2,
+      radius: 12,
+      velocity: 0,
+      angle: 0,
+      segments: [],
+      numSegments: 8,
+      history: [],
+      slitherPhase: 0,
+
+      reset() {
+        this.x = 95;
+        this.y = GAME_HEIGHT / 2;
+        this.velocity = 0;
+        this.angle = 0;
+        this.slitherPhase = 0;
+        this.history = [];
+        this.segments = [];
+
+        for (let i = 0; i < this.numSegments; i++) {
+          this.segments.push({
+            x: this.x - (i + 1) * 9,
+            y: this.y,
+            radius: Math.max(3.5, 9 - i * 0.75)
+          });
+        }
+      },
+
+      thrust() {
+        // Reverse flap: pushes viper DOWNWARDS
+        this.velocity = THRUST;
+        sound.playThrust();
+
+        // Downward thruster exhaust shoots UPWARDS
+        for (let i = 0; i < 7; i++) {
+          particles.push(new Particle(
+            this.x - 6 + (Math.random() * 6 - 3),
+            this.y - 7,
+            Math.random() > 0.4 ? activeConfig.color : '#00f0ff',
+            (Math.random() - 0.5) * 2.5 - 1.5,
+            -(Math.random() * 4 + 2.5),
+            Math.random() * 3 + 1.8,
+            20
+          ));
+        }
+      },
+
+      update() {
+        // Apply Reverse Gravity: constant UPWARD acceleration
+        this.velocity += GRAVITY;
+
+        // Clamp upward and downward speeds
+        if (this.velocity < MAX_UP_SPEED) this.velocity = MAX_UP_SPEED;
+        if (this.velocity > MAX_DOWN_SPEED) this.velocity = MAX_DOWN_SPEED;
+
+        this.y += this.velocity;
+        this.slitherPhase += 0.18;
+
+        // Smoothly interpolate rotation based on vertical speed
+        const targetAngle = (this.velocity / MAX_DOWN_SPEED) * 0.55;
+        this.angle += (targetAngle - this.angle) * 0.22;
+
+        // Save position history for articulated trailing body
+        this.history.unshift({ x: this.x, y: this.y, angle: this.angle });
+        if (this.history.length > 50) this.history.pop();
+
+        for (let i = 0; i < this.numSegments; i++) {
+          const index = Math.min((i + 1) * 3, this.history.length - 1);
+          const hist = this.history[index] || { x: this.x - (i + 1) * 8, y: this.y };
+          const wave = Math.sin(this.slitherPhase - i * 0.6) * (3.5 - i * 0.2);
+
+          this.segments[i].x = hist.x;
+          this.segments[i].y = hist.y + wave;
+        }
+
+        // Tail ribbon particles
+        if (frames % 3 === 0 && this.segments.length > 0) {
+          const tail = this.segments[this.segments.length - 1];
+          particles.push(new Particle(
+            tail.x - 2,
+            tail.y,
+            activeConfig.color,
+            -(Math.random() * 1.5 + 0.8),
+            -(Math.random() * 0.8 - 0.4),
+            2.2,
+            16
+          ));
+        }
+      },
+
+      draw(ctx) {
+        ctx.save();
+
+        // 1. Draw Trailing Body Segments (Tail to Neck)
+        for (let i = this.segments.length - 1; i >= 0; i--) {
+          const seg = this.segments[i];
+
+          ctx.save();
+          ctx.shadowColor = (i % 2 === 0) ? activeConfig.color : '#00f0ff';
+          ctx.shadowBlur = 8;
+
+          if (i > 0) {
+            const nextSeg = this.segments[i - 1];
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(seg.x, seg.y);
+            ctx.lineTo(nextSeg.x, nextSeg.y);
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = '#061622';
+          ctx.strokeStyle = (i % 2 === 0) ? activeConfig.color : '#00f0ff';
+          ctx.lineWidth = 1.6;
+
+          ctx.beginPath();
+          ctx.arc(seg.x, seg.y, seg.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = (i % 2 === 0) ? activeConfig.color : '#ffffff';
+          ctx.beginPath();
+          ctx.arc(seg.x, seg.y, Math.max(1.2, seg.radius * 0.4), 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+        }
+
+        // 2. Connect Neck to Head
+        if (this.segments.length > 0) {
+          ctx.strokeStyle = activeConfig.color;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(this.segments[0].x, this.segments[0].y);
+          ctx.lineTo(this.x, this.y);
+          ctx.stroke();
+        }
+
+        // 3. Draw Cyber-Viper Head
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+
+        // Ambient Aura Glow
+        const aura = ctx.createRadialGradient(0, 0, 3, 0, 0, 22);
+        aura.addColorStop(0, activeConfig.color);
+        aura.addColorStop(0.7, 'rgba(0, 240, 255, 0.15)');
+        aura.addColorStop(1, 'transparent');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Predatory Head Shell
+        ctx.shadowColor = activeConfig.color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#05131e';
+        ctx.strokeStyle = activeConfig.color;
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        ctx.moveTo(18, 0);               // Snout
+        ctx.lineTo(6, -9);               // Upper brow
+        ctx.lineTo(-10, -8);             // Upper rear jaw
+        ctx.lineTo(-6, 0);               // Neck joint
+        ctx.lineTo(-10, 8);              // Lower rear jaw
+        ctx.lineTo(6, 9);                // Lower jaw
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Crown Stripe
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(14, 0);
+        ctx.lineTo(-4, 0);
+        ctx.stroke();
+
+        // Cyber Slit Eye
+        ctx.shadowColor = '#ff0055';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#ff0055';
+        ctx.beginPath();
+        ctx.ellipse(4, -4, 4.5, 2, Math.PI / 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(5, -4, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Thruster Ports
+        ctx.fillStyle = '#00f0ff';
+        ctx.fillRect(-12, -7, 3, 4);
+        ctx.fillRect(-12, 3, 3, 4);
+
+        ctx.restore();
+      }
+    };
+
+    // --- Obstacles: Technological Data Barriers ---
+    class LaserGate {
+      constructor(x, gapHeight) {
+        this.x = x;
+        this.width = 62;
+        this.gap = gapHeight;
+        this.passed = false;
+
+        // Safe margins to ensure gaps are always physically reachable
+        const minGapY = CEILING_HEIGHT + 65 + this.gap / 2;
+        const maxGapY = GAME_HEIGHT - GROUND_HEIGHT - 65 - this.gap / 2;
+        this.gapY = Math.floor(Math.random() * (maxGapY - minGapY + 1)) + minGapY;
+
+        this.topBarrierBottom = this.gapY - this.gap / 2;
+        this.bottomBarrierTop = this.gapY + this.gap / 2;
+      }
+
+      update() {
+        // Move at exactly activeConfig.barrierSpeed (1.0x, 1.5x, 2.0x)
+        this.x -= activeConfig.barrierSpeed;
+      }
+
+      draw(ctx) {
+        ctx.save();
+
+        const drawDataPylon = (x, y, w, h, isTop) => {
+          const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+          grad.addColorStop(0, '#120414');
+          grad.addColorStop(0.3, '#2a082e');
+          grad.addColorStop(0.7, '#1d0522');
+          grad.addColorStop(1, '#0c020e');
+
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, y, w, h);
+
+          // Neon Edge Borders
+          ctx.shadowColor = '#ff007f';
+          ctx.shadowBlur = 12;
+          ctx.strokeStyle = '#ff007f';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y + h);
+          ctx.moveTo(x + w, y);
+          ctx.lineTo(x + w, y + h);
+          ctx.stroke();
+
+          // High-Energy Core Conduit
+          ctx.strokeStyle = 'rgba(255, 0, 100, 0.45)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + w / 2, y);
+          ctx.lineTo(x + w / 2, y + h);
+          ctx.stroke();
+
+          // Laser Emitter Cap
+          const capHeight = 18;
+          const capY = isTop ? (y + h - capHeight) : y;
+          const capOverhang = 4;
+
+          ctx.shadowColor = '#ff003c';
+          ctx.shadowBlur = 14;
+          ctx.fillStyle = '#26041a';
+          ctx.fillRect(x - capOverhang, capY, w + capOverhang * 2, capHeight);
+          ctx.strokeStyle = '#ff003c';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x - capOverhang, capY, w + capOverhang * 2, capHeight);
+
+          // Pulsating laser diode
+          const pulseColor = (frames % 30 < 15) ? '#ff007f' : '#ffffff';
+          ctx.fillStyle = pulseColor;
+          ctx.beginPath();
+          ctx.arc(x + w / 2, capY + capHeight / 2, 4, 0, Math.PI * 2);
+          ctx.fill();
+        };
+
+        // Top barrier pylon
+        drawDataPylon(this.x, CEILING_HEIGHT, this.width, this.topBarrierBottom - CEILING_HEIGHT, true);
+
+        // Bottom barrier pylon
+        drawDataPylon(this.x, this.bottomBarrierTop, this.width, (GAME_HEIGHT - GROUND_HEIGHT) - this.bottomBarrierTop, false);
+
+        // Laser Tripwire Lattice across gap
+        ctx.shadowColor = '#ff007f';
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = 'rgba(255, 0, 127, 0.24)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.topBarrierBottom);
+        ctx.lineTo(this.x, this.bottomBarrierTop);
+        ctx.moveTo(this.x + this.width, this.topBarrierBottom);
+        ctx.lineTo(this.x + this.width, this.bottomBarrierTop);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.restore();
+      }
+
+      collidesWith(v) {
+        const headLeft = v.x - v.radius + 2;
+        const headRight = v.x + v.radius - 2;
+        const headTop = v.y - v.radius + 3;
+        const headBottom = v.y + v.radius - 3;
+
+        if (headRight > this.x && headLeft < this.x + this.width) {
+          if (headTop < this.topBarrierBottom || headBottom > this.bottomBarrierTop) {
+            return true;
+          }
+        }
+
+        // Check front body segments for fair, responsive collision
+        for (let i = 0; i < Math.min(2, v.segments.length); i++) {
+          const seg = v.segments[i];
+          if (seg.x + seg.radius > this.x && seg.x - seg.radius < this.x + this.width) {
+            if (seg.y - seg.radius < this.topBarrierBottom || seg.y + seg.radius > this.bottomBarrierTop) {
+              return true;
+            }
+          }
+        }
+
+        return false;
+      }
+    }
+
+    let laserGates = [];
+
+    // --- Background & Boundaries ---
+    function drawBackground() {
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+      bgGrad.addColorStop(0, '#02040b');
+      bgGrad.addColorStop(0.5, '#070f20');
+      bgGrad.addColorStop(1, '#030610');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+      // Starfield
+      ctx.save();
+      for (const star of backgroundStars) {
+        star.x -= star.speed;
+        if (star.x < 0) star.x = GAME_WIDTH;
+        star.alpha += Math.sin(frames * star.pulseSpeed) * 0.02;
+        const currentAlpha = Math.max(0.1, Math.min(1, star.alpha));
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Top Ceiling Boundary (Anti-Gravity Hazard Bar)
+      ctx.save();
+      ctx.fillStyle = '#050a18';
+      ctx.fillRect(0, 0, GAME_WIDTH, CEILING_HEIGHT);
+      ctx.shadowColor = '#ff003c';
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = '#ff003c';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, CEILING_HEIGHT);
+      ctx.lineTo(GAME_WIDTH, CEILING_HEIGHT);
+      ctx.stroke();
+
+      const chevronOffset = (frames * 1.6) % 28;
+      ctx.strokeStyle = 'rgba(255, 0, 60, 0.4)';
+      ctx.lineWidth = 2;
+      for (let x = -chevronOffset; x < GAME_WIDTH + 28; x += 28) {
+        ctx.beginPath();
+        ctx.moveTo(x, 2);
+        ctx.lineTo(x + 12, CEILING_HEIGHT - 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Bottom Cyber Grid Floor
+      ctx.save();
+      const groundY = GAME_HEIGHT - GROUND_HEIGHT;
+      ctx.fillStyle = '#060c1d';
+      ctx.fillRect(0, groundY, GAME_WIDTH, GROUND_HEIGHT);
+
+      ctx.shadowColor = activeConfig.color;
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = activeConfig.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(GAME_WIDTH, groundY);
+      ctx.stroke();
+
+      // Moving Grid Lines
+      const gridOffset = (frames * activeConfig.barrierSpeed) % 24;
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.22)';
+      ctx.lineWidth = 1.5;
+      for (let x = -gridOffset; x < GAME_WIDTH + 24; x += 24) {
+        ctx.beginPath();
+        ctx.moveTo(x, groundY);
+        ctx.lineTo(x - 12, GAME_HEIGHT);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // --- Difficulty Selection Handling ---
+    function setDifficulty(diffKey, playSound = true) {
+      if (!DIFFICULTY_CONFIG[diffKey]) return;
+      selectedDifficultyKey = diffKey;
+      activeConfig = DIFFICULTY_CONFIG[diffKey];
+      localStorage.setItem('fv_selected_diff', diffKey);
+
+      // Update Card Visuals on Start Screen
+      diffCards.forEach(card => {
+        const isMatch = card.getAttribute('data-diff') === diffKey;
+        card.classList.toggle('selected', isMatch);
+        card.setAttribute('aria-checked', isMatch ? 'true' : 'false');
+      });
+
+      // Update In-Game HUD tag
+      hudDiffTag.textContent = activeConfig.name;
+      hudDiffTag.className = 'diff-badge-hud ' + activeConfig.class;
+
+      if (playSound) sound.playSelect();
+    }
+
+    // Initialize difficulty selection UI
+    setDifficulty(selectedDifficultyKey, false);
+
+    // --- State Transitions & Mission Control ---
+    function startMission() {
+      sound.init();
+      // Ensure active config matches chosen difficulty
+      activeConfig = DIFFICULTY_CONFIG[selectedDifficultyKey];
+
+      // Update HUD
+      hudDiffTag.textContent = activeConfig.name;
+      hudDiffTag.className = 'diff-badge-hud ' + activeConfig.class;
+
+      // Reset state and launch
+      currentState = STATE.PLAYING;
+      startScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+      score = 0;
+      hudScore.textContent = '0';
+      laserGates = [];
+      particles = [];
+      viper.reset();
+      viper.thrust();
+    }
+
+    function returnToDifficultyMenu() {
+      currentState = STATE.MENU;
+      gameOverScreen.classList.add('hidden');
+      startScreen.classList.remove('hidden');
+      laserGates = [];
+      particles = [];
+      viper.reset();
+      // Refresh selected difficulty card display
+      setDifficulty(selectedDifficultyKey, false);
+    }
+
+    function triggerGameOver() {
+      if (currentState === STATE.GAMEOVER) return;
+      currentState = STATE.GAMEOVER;
+      sound.playCrash();
+      screenShake = 18;
+
+      // Cyber disintegration particle burst
+      for (let i = 0; i < 42; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 6 + 2;
+        particles.push(new Particle(
+          viper.x,
+          viper.y,
+          Math.random() > 0.5 ? activeConfig.color : '#ff007f',
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          Math.random() * 4 + 2,
+          45
+        ));
+      }
+
+      // Check high score for current difficulty
+      const prevBest = getHighScore(selectedDifficultyKey);
+      let isNewRecord = false;
+      if (score > prevBest) {
+        setHighScore(selectedDifficultyKey, score);
+        isNewRecord = true;
+      }
+
+      finalScoreEl.textContent = score;
+      bestScoreEl.textContent = Math.max(score, prevBest);
+      
+      // Update Game Over modal difficulty badge
+      overDiffBadge.textContent = activeConfig.name;
+      overDiffBadge.className = 'diff-badge-hud ' + activeConfig.class;
+
+      newBestBadge.style.display = isNewRecord && score > 0 ? 'inline-block' : 'none';
+
+      setTimeout(() => {
+        gameOverScreen.classList.remove('hidden');
+      }, 350);
+    }
+
+    function handleAction() {
+      sound.init();
+      if (currentState === STATE.MENU) {
+        // Space/Enter on menu starts the mission
+        startMission();
+      } else if (currentState === STATE.PLAYING) {
+        viper.thrust();
+      }
+    }
+
+    function togglePause() {
+      if (currentState === STATE.PLAYING) {
+        currentState = STATE.PAUSED;
+        pauseBtn.textContent = '▶';
+        pauseBtn.setAttribute('title', 'Resume Game (P)');
+      } else if (currentState === STATE.PAUSED) {
+        currentState = STATE.PLAYING;
+        pauseBtn.textContent = '⏸';
+        pauseBtn.setAttribute('title', 'Pause Game (P)');
+      }
+    }
+
+    // --- Event Listeners ---
+    // Difficulty card selection (does NOT start the game immediately, sets selection)
+    diffCards.forEach(card => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const diff = card.getAttribute('data-diff');
+        setDifficulty(diff);
+      });
+    });
+
+    // Start Mission Button
+    startMissionBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startMission();
+    });
+
+    // Retry Mission Button (Restart using current difficulty)
+    retryMissionBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startMission();
+    });
+
+    // Change Difficulty Button (Return to selection screen)
+    changeDifficultyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      returnToDifficultyMenu();
+    });
+
+    // Sound toggle
+    soundBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.toggleMute();
+    });
+
+    // Pause toggle
+    pauseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePause();
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowDown' || e.code === 'KeyW' || e.code === 'KeyS') {
+        e.preventDefault();
+        handleAction();
+      } else if (e.code === 'Enter') {
+        if (currentState === STATE.MENU) {
+          e.preventDefault();
+          startMission();
+        } else if (currentState === STATE.GAMEOVER && !gameOverScreen.classList.contains('hidden')) {
+          e.preventDefault();
+          startMission();
+        }
+      } else if (e.code === 'Digit1') {
+        if (currentState === STATE.MENU) setDifficulty('rookie');
+      } else if (e.code === 'Digit2') {
+        if (currentState === STATE.MENU) setDifficulty('pro');
+      } else if (e.code === 'Digit3') {
+        if (currentState === STATE.MENU) setDifficulty('legend');
+      } else if (e.code === 'KeyP' || e.code === 'Escape') {
+        e.preventDefault();
+        togglePause();
+      } else if (e.code === 'KeyM') {
+        sound.toggleMute();
+      }
+    });
+
+    // Canvas click / touch for downward thrust
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handleAction();
+    });
+
+    // --- Main Game Loop (Fluid 60FPS) ---
+    function gameLoop() {
+      frames++;
+
+      // Screen Shake on Collision
+      ctx.save();
+      if (screenShake > 0) {
+        const shakeX = (Math.random() - 0.5) * screenShake;
+        const shakeY = (Math.random() - 0.5) * screenShake;
+        ctx.translate(shakeX, shakeY);
+        screenShake *= 0.88;
+        if (screenShake < 0.5) screenShake = 0;
+      }
+
+      // 1. Draw Background & Hazards
+      drawBackground();
+
+      // 2. Active Gameplay Logic
+      if (currentState === STATE.PLAYING) {
+        viper.update();
+
+        // Hit top ceiling (Reverse Gravity hazard)
+        if (viper.y - viper.radius <= CEILING_HEIGHT) {
+          viper.y = CEILING_HEIGHT + viper.radius;
+          triggerGameOver();
+        }
+
+        // Hit bottom cyber floor
+        const groundThreshold = GAME_HEIGHT - GROUND_HEIGHT - viper.radius;
+        if (viper.y >= groundThreshold) {
+          viper.y = groundThreshold;
+          triggerGameOver();
+        }
+
+        // Spawn Data Barriers based on difficulty interval
+        if (frames % activeConfig.spawnInterval === 0) {
+          laserGates.push(new LaserGate(GAME_WIDTH + 20, activeConfig.gateGap));
+        }
+
+        // Update Laser Gates
+        for (let i = laserGates.length - 1; i >= 0; i--) {
+          const gate = laserGates[i];
+          gate.update();
+
+          // Scoring logic
+          if (!gate.passed && gate.x + gate.width < viper.x) {
+            gate.passed = true;
+            score++;
+            hudScore.textContent = score;
+            hudScore.classList.add('pulse');
+            setTimeout(() => hudScore.classList.remove('pulse'), 200);
+            sound.playScore();
+
+            // Score spark burst
+            for (let k = 0; k < 12; k++) {
+              particles.push(new Particle(
+                viper.x + 8,
+                viper.y,
+                activeConfig.color,
+                (Math.random() - 0.5) * 3,
+                (Math.random() - 0.5) * 3,
+                Math.random() * 3 + 1.5,
+                24
+              ));
+            }
+          }
+
+          // Gate collision check
+          if (gate.collidesWith(viper)) {
+            triggerGameOver();
+          }
+
+          // Remove offscreen gates
+          if (gate.x + gate.width < -50) {
+            laserGates.splice(i, 1);
+          }
+        }
+      }
+
+      // 3. Draw Laser Gates
+      for (const gate of laserGates) {
+        gate.draw(ctx);
+      }
+
+      // 4. Update & Draw Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.update();
+        pt.draw(ctx);
+        if (pt.life <= 0 || pt.size <= 0.1) {
+          particles.splice(i, 1);
+        }
+      }
+
+      // 5. Draw Cyber-Viper
+      if (currentState !== STATE.GAMEOVER || screenShake > 2) {
+        viper.draw(ctx);
+      }
+
+      ctx.restore();
+
+      animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    // Launch initial loop
+    animationFrameId = requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
